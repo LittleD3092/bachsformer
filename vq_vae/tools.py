@@ -126,7 +126,8 @@ class TrainerVQVAE():
         work_dir = "data/midi/"
         miniaturizer = MidiMiniature(1) # 1/4th
 
-        tunes = [t for t in os.listdir(work_dir) if t.split(".")[1]=="mid"]
+        tunes = [t for t in os.listdir(work_dir) if t.split(".")[-1]=="mid"]
+        print("files to process: ",tunes)
         to_validate_later = tunes.pop()
         # training
         for k,tune in enumerate(tunes):

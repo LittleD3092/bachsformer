@@ -31,14 +31,18 @@ class MidiMiniature(Midi):
         self.empty_bar_miniature = np.zeros([88,self.miniature_ticks])
 
     def preprocess_midi(self,filepath):
+        print("filepath:", filepath)
         tracks = MidiFile(filepath).tracks
         events = []
         for track in tracks:
             cur_time = 0; 
             notes_on = np.empty(0).astype(int); start_events = np.empty(0).astype(int)
             for msg in track:
+                # print("start_events:", start_events)
                 if msg.is_meta:continue
                 elif msg.type.split("_")[0] == "note":
+                    # if msg.note - 21 == 15:
+                    #     print("msg:", msg)
                     note = msg.note - 21 # 0 means A0
                     cur_time += msg.time
                     # note on
@@ -48,10 +52,18 @@ class MidiMiniature(Midi):
                         start_events = np.hstack( (start_events,cur_time) )
                     # note off
                     else:
-                        note_idx = np.where(notes_on==note)[0]
-                        start_event = start_events[note_idx][0]
-                        events.append(((start_event,cur_time,note)))
-                        notes_on = np.delete(notes_on,note_idx); start_events = np.delete(start_events,note_idx)
+                        try:
+                            # print("notes_on:", notes_on)
+                            # print("note:", note)
+                            # print('start_events:', start_events)
+                            note_idx = np.where(notes_on==note)[0]
+                            # print("note_idx:", note_idx)
+                            start_event = start_events[note_idx][0]
+                            events.append(((start_event,cur_time,note)))
+                            # print("removing note_idx:", note_idx[0])
+                            notes_on = np.delete(notes_on,note_idx[0]); start_events = np.delete(start_events,note_idx[0])
+                        except:
+                            print("file:",filepath, "has a problem of note off")
         events.sort()
         return events
 
@@ -70,7 +82,11 @@ class MidiMiniature(Midi):
         bars = []; tails_to_add = []
         bar_miniature = self.empty_bar_miniature.copy()
         cur_bar=0
+        # print("events:",events)
         for start, end, note in events:
+            # print(f"start:{start},end:{end},note:{note}")
+            # print("self.bar_length:",self.bar_length)
+            # print("self.compress_ratio:",self.compress_ratio)
             start_bar_index = start//self.bar_length
             if start_bar_index>cur_bar:
                 for i in range(start_bar_index-cur_bar):
@@ -85,7 +101,7 @@ class MidiMiniature(Midi):
                         tails_to_add.pop(0)
                 cur_bar = start_bar_index
             # start miniature grid index
-            grid_start_index = round((start%self.bar_length)/self.compress_ratio)
+            grid_start_index = int((start%self.bar_length)//self.compress_ratio)
             # check if note fall entirely in currnt bar, otherwise store the tail and add it later
             end_bar_index = end//self.bar_length
             if start_bar_index<end_bar_index: 
@@ -96,7 +112,10 @@ class MidiMiniature(Midi):
                     tails_to_add.append((next_start,next_end,note))
                 if not end_bar_index-start_bar_index-1: next_end = (end_bar_index)*self.bar_length
                 if end%self.bar_length: tails_to_add.append((next_end,end,note))
-            else: gird_end_index = round((end%self.bar_length)/self.compress_ratio)
+            else: gird_end_index = int((end%self.bar_length)//self.compress_ratio)
+            # print("grid_start_index:",grid_start_index)
+            # print("grid_end_index:", gird_end_index)
+            # print("note:", note)
             bar_miniature[note,grid_start_index:gird_end_index] = 1
             bar_miniature[note,grid_start_index] = 2 # note on event
         bars.append(bar_miniature)
